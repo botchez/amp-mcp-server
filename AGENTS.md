@@ -192,7 +192,7 @@ HTTP (Docker / remote):
 - [x] HTTP smoke test (`tools/list` returns 4 / 8 tools depending on `AMP_ALLOW_WRITES`)
 - [x] `git init`, commits pushed to GitLab `origin/main`
 - [x] Docker `compose build` clean; container boots; `/mcp` reachable on the mapped port
-- [x] **Live homelab end-to-end** — verified 2026-05-01 against `https://amp.darkforge.app` with `mcp_bot-test`. `amp_list_instances` returned 4 real instances (ADS, Minecraft, two GenericModule); `amp_get_instance_status` and `amp_get_console_output` returned live data via the `InstanceLogin` proxy path. Write tools not yet exercised against a real instance — try one before flipping `AMP_ALLOW_WRITES=true` in production.
+- [x] **Live homelab end-to-end** — verified 2026-05-01 against `https://amp.darkforge.app` with `mcp_bot-test`. `amp_list_instances` returned 4 real instances (ADS, Minecraft, two GenericModule); `amp_get_instance_status` and `amp_get_console_output` returned live data via the `InstanceLogin` proxy path. Both **HTTP** (curl POST `/mcp`) and **stdio** (`scripts/smoke-stdio.mjs` driving the binary as a subprocess) verified. Write tools not yet exercised against a real instance — try one before flipping `AMP_ALLOW_WRITES=true` in production.
 
 ## v0.2 candidates
 
