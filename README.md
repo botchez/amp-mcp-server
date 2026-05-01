@@ -12,11 +12,19 @@ Read-only (always enabled):
 - `amp_get_instance_status` — state, uptime, CPU/RAM/players for one instance
 - `amp_get_active_users` — connected users for one instance
 - `amp_get_console_output` — recent console lines for one instance
+- `amp_get_host_status` — state, uptime, CPU/RAM for the AMP controller host itself
+- `amp_get_running_tasks` — currently-running tasks on one instance (with progress %)
+- `amp_get_update_info` — pending game-server updates for one instance
+- `amp_list_backups` — local backups for one instance
 
 Write tools (gated by `AMP_ALLOW_WRITES=true`):
 
-- `amp_start_instance` / `amp_stop_instance` / `amp_restart_instance`
-- `amp_send_console_command`
+- `amp_start_instance` / `amp_stop_instance` / `amp_restart_instance` — instance lifecycle
+- `amp_sleep_instance` — soft shutdown (resumable faster than Stop; module-dependent)
+- `amp_send_console_command` — send a command to one instance's console
+- `amp_take_backup` — trigger a backup (poll completion via `amp_get_running_tasks`)
+- `amp_update_application` — apply a pending game-server update (long-running)
+- `amp_end_user_session` — disconnect a user session (universal kick across modules)
 
 Default-off prevents accidental destructive calls.
 

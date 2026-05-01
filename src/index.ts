@@ -8,9 +8,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { AmpClient } from "./amp-client.js";
 import { registerInstanceTools } from "./tools/instances.js";
 import { registerConsoleTools } from "./tools/console.js";
+import { registerOperationsTools } from "./tools/operations.js";
 import { logger, type Logger } from "./logger.js";
 
-const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.3" };
+const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.4" };
 
 const amp = AmpClient.fromEnv();
 
@@ -18,6 +19,7 @@ function buildServer(log: Logger = logger): McpServer {
   const server = new McpServer(SERVER_INFO);
   registerInstanceTools(server, amp, log);
   registerConsoleTools(server, amp, log);
+  registerOperationsTools(server, amp, log);
   return server;
 }
 
