@@ -2,9 +2,13 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
 import { withTrace, type Logger } from "../logger.js";
-import { writesEnabled } from "./_shared.js";
 
-export function registerConsoleTools(server: McpServer, amp: AmpClient, log: Logger): void {
+export function registerConsoleTools(
+  server: McpServer,
+  amp: AmpClient,
+  log: Logger,
+  allowWrites: boolean,
+): void {
   server.registerTool(
     "amp_get_console_output",
     {
@@ -36,7 +40,7 @@ export function registerConsoleTools(server: McpServer, amp: AmpClient, log: Log
     ),
   );
 
-  if (!writesEnabled()) return;
+  if (!allowWrites) return;
 
   server.registerTool(
     "amp_send_console_command",

@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import type { Express } from "express";
 import type { Logger } from "../logger.js";
 import type { AuthMiddleware, OAuthAuthConfig } from "./types.js";
-import { extractBearer } from "./_shared.js";
+import { extractBearer } from "./shared.js";
 
 export async function discoverJwksUrl(issuer: string): Promise<string> {
   const base = issuer.replace(/\/$/, "");

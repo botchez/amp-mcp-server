@@ -2,9 +2,14 @@ import { lookupState } from "@neuralnexus/ampapi";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
 import { withTrace, type Logger } from "../logger.js";
-import { instanceIdField, jsonContent, writesEnabled } from "./_shared.js";
+import { instanceIdField, jsonContent } from "./shared.js";
 
-export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Logger): void {
+export function registerInstanceTools(
+  server: McpServer,
+  amp: AmpClient,
+  log: Logger,
+  allowWrites: boolean,
+): void {
   server.registerTool(
     "amp_list_instances",
     {
@@ -60,7 +65,7 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Lo
     ),
   );
 
-  if (!writesEnabled()) return;
+  if (!allowWrites) return;
 
   server.registerTool(
     "amp_start_instance",

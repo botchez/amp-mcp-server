@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Logger } from "../logger.js";
 import type { AuthMiddleware, BearerAuthConfig } from "./types.js";
-import { extractBearer } from "./_shared.js";
+import { extractBearer } from "./shared.js";
 
 const sha256 = (s: string): Buffer => createHash("sha256").update(s).digest();
 

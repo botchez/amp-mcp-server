@@ -4,9 +4,14 @@ import type { UUID } from "@neuralnexus/ampapi";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
 import { withTrace, type Logger } from "../logger.js";
-import { instanceIdField, jsonContent, writesEnabled } from "./_shared.js";
+import { instanceIdField, jsonContent } from "./shared.js";
 
-export function registerOperationsTools(server: McpServer, amp: AmpClient, log: Logger): void {
+export function registerOperationsTools(
+  server: McpServer,
+  amp: AmpClient,
+  log: Logger,
+  allowWrites: boolean,
+): void {
   // --- Read-only ---------------------------------------------------------
 
   server.registerTool(
@@ -68,7 +73,7 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
 
   // --- Gated writes ------------------------------------------------------
 
-  if (!writesEnabled()) return;
+  if (!allowWrites) return;
 
   server.registerTool(
     "amp_take_backup",

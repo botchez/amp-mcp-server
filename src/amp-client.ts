@@ -1,11 +1,6 @@
 import { ADS } from "@neuralnexus/ampapi";
 import type { CommonAPI, IADSInstance, Instance, LoginResult, UUID } from "@neuralnexus/ampapi";
-
-export interface AmpClientOptions {
-  baseUri: string;
-  username: string;
-  password: string;
-}
+import type { AmpConfig } from "./config.js";
 
 export interface FlatInstance extends Instance {
   TargetFriendlyName: string;
@@ -31,22 +26,12 @@ function isAuthError(err: unknown): boolean {
 }
 
 export class AmpClient {
-  private readonly opts: AmpClientOptions;
+  private readonly cfg: AmpConfig;
   private controllerPromise: Promise<ADS> | null = null;
   private readonly instanceCache = new Map<string, Promise<CommonAPI>>();
 
-  constructor(opts: AmpClientOptions) {
-    this.opts = opts;
-  }
-
-  static fromEnv(): AmpClient {
-    const { AMP_URL, AMP_USERNAME, AMP_PASSWORD } = process.env;
-    if (!AMP_URL || !AMP_USERNAME || !AMP_PASSWORD) {
-      throw new Error(
-        "amp-mcp-server: AMP_URL, AMP_USERNAME, and AMP_PASSWORD must be set in the environment.",
-      );
-    }
-    return new AmpClient({ baseUri: AMP_URL, username: AMP_USERNAME, password: AMP_PASSWORD });
+  constructor(cfg: AmpConfig) {
+    this.cfg = cfg;
   }
 
   async getController(): Promise<ADS> {
@@ -74,7 +59,7 @@ export class AmpClient {
   }
 
   private async loginController(): Promise<ADS> {
-    const ads = new ADS(this.opts.baseUri, this.opts.username, this.opts.password);
+    const ads = new ADS(this.cfg.baseUri, this.cfg.username, this.cfg.password);
     const result = (await ads.APILogin()) as LoginResult | undefined;
     if (!result || result.success === false) {
       const reason = result?.resultReason?.trim();
