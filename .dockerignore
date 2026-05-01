@@ -1,0 +1,37 @@
+# Trim Docker build context — most of these match .gitignore but we also
+# want to skip git metadata, plan/agent docs, and build artifacts that
+# the multi-stage Dockerfile produces inside the builder image anyway.
+
+# Dependencies (the builder reinstalls these via `npm ci`)
+node_modules/
+
+# Build output
+dist/
+
+# Git metadata
+.git/
+.gitignore
+.gitattributes
+
+# Env files (image must never contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Editor / OS cruft
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docs we don't ship inside the image
+AGENTS.md
+docker-compose.yml
+.dockerignore

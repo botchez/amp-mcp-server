@@ -31,9 +31,14 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@cubecoders/ampapi": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@neuralnexus/ampapi": "^1.0.19",
     "express": "^5.2.1",
     "zod": "^4.4.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
   }
 }
