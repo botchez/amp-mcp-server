@@ -2,8 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
 import { withTrace, type Logger } from "../logger.js";
-
-const writesEnabled = (): boolean => process.env.AMP_ALLOW_WRITES === "true";
+import { writesEnabled } from "./_shared.js";
 
 export function registerConsoleTools(server: McpServer, amp: AmpClient, log: Logger): void {
   server.registerTool(
@@ -23,17 +22,18 @@ export function registerConsoleTools(server: McpServer, amp: AmpClient, log: Log
           .describe("Limit to the most recent N console entries (default: all returned by GetUpdates)."),
       },
     },
-    withTrace(log, "amp_get_console_output", async ({ instanceId, lines }) => {
-      const inst = await amp.getInstance(instanceId);
-      const updates = await inst.Core.GetUpdates();
-      const entries = lines ? updates.ConsoleEntries.slice(-lines) : updates.ConsoleEntries;
-      const text = entries
-        .map((e) => `[${e.Timestamp}] [${e.Type}] ${e.Source}: ${e.Contents}`)
-        .join("\n");
-      return {
-        content: [{ type: "text" as const, text: text || "(no console output)" }],
-      };
-    }),
+    withTrace(log, "amp_get_console_output", async ({ instanceId, lines }) =>
+      amp.withInstance(instanceId, async (inst) => {
+        const updates = await inst.Core.GetUpdates();
+        const entries = lines ? updates.ConsoleEntries.slice(-lines) : updates.ConsoleEntries;
+        const text = entries
+          .map((e) => `[${e.Timestamp}] [${e.Type}] ${e.Source}: ${e.Contents}`)
+          .join("\n");
+        return {
+          content: [{ type: "text" as const, text: text || "(no console output)" }],
+        };
+      }),
+    ),
   );
 
   if (!writesEnabled()) return;
@@ -49,12 +49,11 @@ export function registerConsoleTools(server: McpServer, amp: AmpClient, log: Log
         command: z.string().min(1).describe("Command text to send to the instance console."),
       },
     },
-    withTrace(log, "amp_send_console_command", async ({ instanceId, command }) => {
-      const inst = await amp.getInstance(instanceId);
-      await inst.Core.SendConsoleMessage(command);
-      return {
-        content: [{ type: "text" as const, text: `sent: ${command}` }],
-      };
-    }),
+    withTrace(log, "amp_send_console_command", async ({ instanceId, command }) =>
+      amp.withInstance(instanceId, async (inst) => {
+        await inst.Core.SendConsoleMessage(command);
+        return { content: [{ type: "text" as const, text: `sent: ${command}` }] };
+      }),
+    ),
   );
 }

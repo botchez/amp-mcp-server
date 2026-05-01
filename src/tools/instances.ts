@@ -1,18 +1,8 @@
-import { z } from "zod";
 import { lookupState } from "@neuralnexus/ampapi";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
 import { withTrace, type Logger } from "../logger.js";
-
-const writesEnabled = (): boolean => process.env.AMP_ALLOW_WRITES === "true";
-
-const instanceIdField = {
-  instanceId: z.string().describe("Instance UUID, as returned by amp_list_instances"),
-};
-
-const jsonContent = (value: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
-});
+import { instanceIdField, jsonContent, writesEnabled } from "./_shared.js";
 
 export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Logger): void {
   server.registerTool(
@@ -49,11 +39,12 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Lo
         "Get state, uptime, and metrics (CPU, RAM, players) for a single AMP instance. Pass an InstanceID from amp_list_instances.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_get_instance_status", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const status = await inst.Core.GetStatus();
-      return jsonContent({ ...status, StateName: lookupState(status.State) });
-    }),
+    withTrace(log, "amp_get_instance_status", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) => {
+        const status = await inst.Core.GetStatus();
+        return jsonContent({ ...status, StateName: lookupState(status.State) });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -64,11 +55,9 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Lo
         "List currently connected users / players for one AMP instance. Returns a map of session UID to username.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_get_active_users", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const users = await inst.Core.GetUserList();
-      return jsonContent(users);
-    }),
+    withTrace(log, "amp_get_active_users", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) => jsonContent(await inst.Core.GetUserList())),
+    ),
   );
 
   if (!writesEnabled()) return;
@@ -80,11 +69,9 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Lo
       description: "Start a stopped AMP instance.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_start_instance", async ({ instanceId }) => {
-      const controller = await amp.getController();
-      const result = await controller.ADSModule.StartInstance(instanceId);
-      return jsonContent(result);
-    }),
+    withTrace(log, "amp_start_instance", async ({ instanceId }) =>
+      amp.withController(async (c) => jsonContent(await c.ADSModule.StartInstance(instanceId))),
+    ),
   );
 
   server.registerTool(
@@ -94,11 +81,9 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Lo
       description: "Stop a running AMP instance gracefully.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_stop_instance", async ({ instanceId }) => {
-      const controller = await amp.getController();
-      const result = await controller.ADSModule.StopInstance(instanceId);
-      return jsonContent(result);
-    }),
+    withTrace(log, "amp_stop_instance", async ({ instanceId }) =>
+      amp.withController(async (c) => jsonContent(await c.ADSModule.StopInstance(instanceId))),
+    ),
   );
 
   server.registerTool(
@@ -108,10 +93,8 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Lo
       description: "Restart an AMP instance (stop then start).",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_restart_instance", async ({ instanceId }) => {
-      const controller = await amp.getController();
-      const result = await controller.ADSModule.RestartInstance(instanceId);
-      return jsonContent(result);
-    }),
+    withTrace(log, "amp_restart_instance", async ({ instanceId }) =>
+      amp.withController(async (c) => jsonContent(await c.ADSModule.RestartInstance(instanceId))),
+    ),
   );
 }

@@ -12,6 +12,24 @@ export interface FlatInstance extends Instance {
   TargetId: UUID;
 }
 
+// Heuristic: AMPAPI's apiCall throws Error("API call failed: <Title>: <Message>...")
+// for API-level errors. Auth-related Titles vary across modules but generally
+// mention session/login/auth. Fall through to retry on these and surface
+// non-auth errors to the caller unchanged.
+function isAuthError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes("session") ||
+    m.includes("unauthor") ||
+    m.includes("not logged in") ||
+    m.includes("login") ||
+    m.includes("forbidden") ||
+    m.includes("401") ||
+    m.includes("403")
+  );
+}
+
 export class AmpClient {
   private readonly opts: AmpClientOptions;
   private controllerPromise: Promise<ADS> | null = null;
@@ -41,6 +59,20 @@ export class AmpClient {
     return this.controllerPromise;
   }
 
+  /**
+   * Run `fn` with a logged-in controller. On an auth-shaped error, evict the
+   * cached session and retry once. Other errors propagate immediately.
+   */
+  async withController<T>(fn: (c: ADS) => Promise<T>): Promise<T> {
+    try {
+      return await fn(await this.getController());
+    } catch (err) {
+      if (!isAuthError(err)) throw err;
+      this.controllerPromise = null;
+      return fn(await this.getController());
+    }
+  }
+
   private async loginController(): Promise<ADS> {
     const ads = new ADS(this.opts.baseUri, this.opts.username, this.opts.password);
     const result = (await ads.APILogin()) as LoginResult | undefined;
@@ -58,17 +90,18 @@ export class AmpClient {
   }
 
   async listInstances(): Promise<FlatInstance[]> {
-    const controller = await this.getController();
-    const targets = await controller.ADSModule.GetInstances();
-    return targets.flatMap((t: IADSInstance) =>
-      t.AvailableInstances.map(
-        (inst): FlatInstance => ({
-          ...inst,
-          TargetFriendlyName: t.FriendlyName,
-          TargetId: t.InstanceId,
-        }),
-      ),
-    );
+    return this.withController(async (controller) => {
+      const targets = await controller.ADSModule.GetInstances();
+      return targets.flatMap((t: IADSInstance) =>
+        t.AvailableInstances.map(
+          (inst): FlatInstance => ({
+            ...inst,
+            TargetFriendlyName: t.FriendlyName,
+            TargetId: t.InstanceId,
+          }),
+        ),
+      );
+    });
   }
 
   async getInstance(instanceId: string): Promise<CommonAPI> {
@@ -81,6 +114,20 @@ export class AmpClient {
     });
     this.instanceCache.set(instanceId, promise);
     return promise;
+  }
+
+  /**
+   * Run `fn` with a logged-in instance handle. On an auth-shaped error,
+   * evict that instance's cached session and retry once.
+   */
+  async withInstance<T>(instanceId: string, fn: (i: CommonAPI) => Promise<T>): Promise<T> {
+    try {
+      return await fn(await this.getInstance(instanceId));
+    } catch (err) {
+      if (!isAuthError(err)) throw err;
+      this.instanceCache.delete(instanceId);
+      return fn(await this.getInstance(instanceId));
+    }
   }
 
   private async loginInstance(instanceId: string): Promise<CommonAPI> {

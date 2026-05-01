@@ -4,16 +4,7 @@ import type { UUID } from "@neuralnexus/ampapi";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
 import { withTrace, type Logger } from "../logger.js";
-
-const writesEnabled = (): boolean => process.env.AMP_ALLOW_WRITES === "true";
-
-const instanceIdField = {
-  instanceId: z.string().describe("Instance UUID, as returned by amp_list_instances"),
-};
-
-const jsonContent = (value: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
-});
+import { instanceIdField, jsonContent, writesEnabled } from "./_shared.js";
 
 export function registerOperationsTools(server: McpServer, amp: AmpClient, log: Logger): void {
   // --- Read-only ---------------------------------------------------------
@@ -26,11 +17,12 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
         "Get state, uptime, and metrics (CPU, RAM) for the AMP controller host machine itself (not a game-server instance).",
       inputSchema: {},
     },
-    withTrace(log, "amp_get_host_status", async () => {
-      const controller = await amp.getController();
-      const status = await controller.Core.GetStatus();
-      return jsonContent({ ...status, StateName: lookupState(status.State) });
-    }),
+    withTrace(log, "amp_get_host_status", async () =>
+      amp.withController(async (c) => {
+        const status = await c.Core.GetStatus();
+        return jsonContent({ ...status, StateName: lookupState(status.State) });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -41,11 +33,9 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
         "List currently-running tasks on one AMP instance (backups, updates, etc.) with progress percentage. Useful for polling whether amp_take_backup or amp_update_application has finished.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_get_running_tasks", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const tasks = await inst.Core.GetTasks();
-      return jsonContent(tasks);
-    }),
+    withTrace(log, "amp_get_running_tasks", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) => jsonContent(await inst.Core.GetTasks())),
+    ),
   );
 
   server.registerTool(
@@ -56,11 +46,9 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
         "Check whether a game-server update is available for one AMP instance. Returns the available version, build, and release notes URL.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_get_update_info", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const info = await inst.Core.GetUpdateInfo();
-      return jsonContent(info);
-    }),
+    withTrace(log, "amp_get_update_info", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) => jsonContent(await inst.Core.GetUpdateInfo())),
+    ),
   );
 
   server.registerTool(
@@ -71,11 +59,11 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
         "List all local backups for one AMP instance (most-recent first per AMP's ordering). Returns whatever shape AMP's LocalFileBackupPlugin reports.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_list_backups", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const backups = await inst.LocalFileBackupPlugin.GetBackups();
-      return jsonContent(backups);
-    }),
+    withTrace(log, "amp_list_backups", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) =>
+        jsonContent(await inst.LocalFileBackupPlugin.GetBackups()),
+      ),
+    ),
   );
 
   // --- Gated writes ------------------------------------------------------
@@ -101,15 +89,17 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
           .describe("If true, the backup is exempt from AMP's retention pruning. Default false."),
       },
     },
-    withTrace(log, "amp_take_backup", async ({ instanceId, title, description, sticky }) => {
-      const inst = await amp.getInstance(instanceId);
-      const result = await inst.LocalFileBackupPlugin.TakeBackup(
-        title,
-        description ?? "Triggered via amp-mcp-server",
-        sticky ?? false,
-      );
-      return jsonContent(result);
-    }),
+    withTrace(log, "amp_take_backup", async ({ instanceId, title, description, sticky }) =>
+      amp.withInstance(instanceId, async (inst) =>
+        jsonContent(
+          await inst.LocalFileBackupPlugin.TakeBackup(
+            title,
+            description ?? "Triggered via amp-mcp-server",
+            sticky ?? false,
+          ),
+        ),
+      ),
+    ),
   );
 
   server.registerTool(
@@ -120,11 +110,9 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
         "Apply a pending game-server update on one AMP instance. Long-running — use amp_get_running_tasks to poll for completion.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_update_application", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const result = await inst.Core.UpdateApplication();
-      return jsonContent(result);
-    }),
+    withTrace(log, "amp_update_application", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) => jsonContent(await inst.Core.UpdateApplication())),
+    ),
   );
 
   server.registerTool(
@@ -140,12 +128,13 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
           .describe("Session UID (the key in the amp_get_active_users map, NOT the username)."),
       },
     },
-    withTrace(log, "amp_end_user_session", async ({ instanceId, sessionId }) => {
-      const inst = await amp.getInstance(instanceId);
-      // Core.EndUserSession is typed Id: UUID; runtime accepts any session string.
-      await inst.Core.EndUserSession(sessionId as unknown as UUID);
-      return jsonContent({ ok: true, sessionId });
-    }),
+    withTrace(log, "amp_end_user_session", async ({ instanceId, sessionId }) =>
+      amp.withInstance(instanceId, async (inst) => {
+        // Core.EndUserSession is typed Id: UUID; runtime accepts any session string.
+        await inst.Core.EndUserSession(sessionId as unknown as UUID);
+        return jsonContent({ ok: true, sessionId });
+      }),
+    ),
   );
 
   server.registerTool(
@@ -156,10 +145,8 @@ export function registerOperationsTools(server: McpServer, amp: AmpClient, log: 
         "Put one AMP instance into a sleep state (resumable more quickly than a full Stop). Not all modules support this — falls back to a stop if not.",
       inputSchema: instanceIdField,
     },
-    withTrace(log, "amp_sleep_instance", async ({ instanceId }) => {
-      const inst = await amp.getInstance(instanceId);
-      const result = await inst.Core.Sleep();
-      return jsonContent(result);
-    }),
+    withTrace(log, "amp_sleep_instance", async ({ instanceId }) =>
+      amp.withInstance(instanceId, async (inst) => jsonContent(await inst.Core.Sleep())),
+    ),
   );
 }

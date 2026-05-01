@@ -11,5 +11,8 @@ services:
       MCP_TRANSPORT: http
       MCP_HOST: 0.0.0.0
       MCP_PORT: 3000
+    # Default: publish to host loopback only. Override MCP_BIND in your .env
+    # to expose externally (e.g. MCP_BIND=0.0.0.0 once you've enabled auth,
+    # or MCP_BIND=10.0.0.5 to a specific interface).
     ports:
-      - "${MCP_PORT:-3000}:3000"
+      - "${MCP_BIND:-127.0.0.1}:${MCP_PORT:-3000}:3000"
