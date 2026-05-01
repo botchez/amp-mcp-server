@@ -2,6 +2,7 @@ import { z } from "zod";
 import { lookupState } from "@neuralnexus/ampapi";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
+import { withTrace, type Logger } from "../logger.js";
 
 const writesEnabled = (): boolean => process.env.AMP_ALLOW_WRITES === "true";
 
@@ -13,7 +14,7 @@ const jsonContent = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
 });
 
-export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
+export function registerInstanceTools(server: McpServer, amp: AmpClient, log: Logger): void {
   server.registerTool(
     "amp_list_instances",
     {
@@ -22,7 +23,7 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
         "Enumerate all instances managed by the AMP controller. Returns InstanceID, name, module type, running state, and parent target for each game-server instance.",
       inputSchema: {},
     },
-    async () => {
+    withTrace(log, "amp_list_instances", async () => {
       const instances = await amp.listInstances();
       return jsonContent(
         instances.map((i) => ({
@@ -37,7 +38,7 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
           Target: i.TargetFriendlyName,
         })),
       );
-    },
+    }),
   );
 
   server.registerTool(
@@ -48,11 +49,11 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
         "Get state, uptime, and metrics (CPU, RAM, players) for a single AMP instance. Pass an InstanceID from amp_list_instances.",
       inputSchema: instanceIdField,
     },
-    async ({ instanceId }) => {
+    withTrace(log, "amp_get_instance_status", async ({ instanceId }) => {
       const inst = await amp.getInstance(instanceId);
       const status = await inst.Core.GetStatus();
       return jsonContent({ ...status, StateName: lookupState(status.State) });
-    },
+    }),
   );
 
   server.registerTool(
@@ -63,11 +64,11 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
         "List currently connected users / players for one AMP instance. Returns a map of session UID to username.",
       inputSchema: instanceIdField,
     },
-    async ({ instanceId }) => {
+    withTrace(log, "amp_get_active_users", async ({ instanceId }) => {
       const inst = await amp.getInstance(instanceId);
       const users = await inst.Core.GetUserList();
       return jsonContent(users);
-    },
+    }),
   );
 
   if (!writesEnabled()) return;
@@ -79,11 +80,11 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
       description: "Start a stopped AMP instance.",
       inputSchema: instanceIdField,
     },
-    async ({ instanceId }) => {
+    withTrace(log, "amp_start_instance", async ({ instanceId }) => {
       const controller = await amp.getController();
       const result = await controller.ADSModule.StartInstance(instanceId);
       return jsonContent(result);
-    },
+    }),
   );
 
   server.registerTool(
@@ -93,11 +94,11 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
       description: "Stop a running AMP instance gracefully.",
       inputSchema: instanceIdField,
     },
-    async ({ instanceId }) => {
+    withTrace(log, "amp_stop_instance", async ({ instanceId }) => {
       const controller = await amp.getController();
       const result = await controller.ADSModule.StopInstance(instanceId);
       return jsonContent(result);
-    },
+    }),
   );
 
   server.registerTool(
@@ -107,10 +108,10 @@ export function registerInstanceTools(server: McpServer, amp: AmpClient): void {
       description: "Restart an AMP instance (stop then start).",
       inputSchema: instanceIdField,
     },
-    async ({ instanceId }) => {
+    withTrace(log, "amp_restart_instance", async ({ instanceId }) => {
       const controller = await amp.getController();
       const result = await controller.ADSModule.RestartInstance(instanceId);
       return jsonContent(result);
-    },
+    }),
   );
 }

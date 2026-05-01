@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from "node:crypto";
 import type { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
@@ -7,16 +8,16 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { AmpClient } from "./amp-client.js";
 import { registerInstanceTools } from "./tools/instances.js";
 import { registerConsoleTools } from "./tools/console.js";
-import { logger } from "./logger.js";
+import { logger, type Logger } from "./logger.js";
 
-const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.2" };
+const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.3" };
 
 const amp = AmpClient.fromEnv();
 
-function buildServer(): McpServer {
+function buildServer(log: Logger = logger): McpServer {
   const server = new McpServer(SERVER_INFO);
-  registerInstanceTools(server, amp);
-  registerConsoleTools(server, amp);
+  registerInstanceTools(server, amp, log);
+  registerConsoleTools(server, amp, log);
   return server;
 }
 
@@ -33,7 +34,10 @@ async function startHttp(): Promise<void> {
   const app = createMcpExpressApp({ host });
 
   app.post("/mcp", async (req: Request, res: Response) => {
-    const server = buildServer();
+    const reqId = randomUUID();
+    const reqLog = logger.child({ reqId });
+    reqLog.debug("incoming /mcp POST");
+    const server = buildServer(reqLog);
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       await server.connect(transport);
@@ -43,7 +47,7 @@ async function startHttp(): Promise<void> {
         void server.close();
       });
     } catch (err) {
-      logger.error({ err }, "error handling /mcp request");
+      reqLog.error({ err }, "error handling /mcp request");
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: "2.0",

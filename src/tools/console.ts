@@ -1,10 +1,11 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AmpClient } from "../amp-client.js";
+import { withTrace, type Logger } from "../logger.js";
 
 const writesEnabled = (): boolean => process.env.AMP_ALLOW_WRITES === "true";
 
-export function registerConsoleTools(server: McpServer, amp: AmpClient): void {
+export function registerConsoleTools(server: McpServer, amp: AmpClient, log: Logger): void {
   server.registerTool(
     "amp_get_console_output",
     {
@@ -22,7 +23,7 @@ export function registerConsoleTools(server: McpServer, amp: AmpClient): void {
           .describe("Limit to the most recent N console entries (default: all returned by GetUpdates)."),
       },
     },
-    async ({ instanceId, lines }) => {
+    withTrace(log, "amp_get_console_output", async ({ instanceId, lines }) => {
       const inst = await amp.getInstance(instanceId);
       const updates = await inst.Core.GetUpdates();
       const entries = lines ? updates.ConsoleEntries.slice(-lines) : updates.ConsoleEntries;
@@ -32,7 +33,7 @@ export function registerConsoleTools(server: McpServer, amp: AmpClient): void {
       return {
         content: [{ type: "text" as const, text: text || "(no console output)" }],
       };
-    },
+    }),
   );
 
   if (!writesEnabled()) return;
@@ -48,12 +49,12 @@ export function registerConsoleTools(server: McpServer, amp: AmpClient): void {
         command: z.string().min(1).describe("Command text to send to the instance console."),
       },
     },
-    async ({ instanceId, command }) => {
+    withTrace(log, "amp_send_console_command", async ({ instanceId, command }) => {
       const inst = await amp.getInstance(instanceId);
       await inst.Core.SendConsoleMessage(command);
       return {
         content: [{ type: "text" as const, text: `sent: ${command}` }],
       };
-    },
+    }),
   );
 }

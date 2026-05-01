@@ -1,4 +1,4 @@
-import pino from "pino";
+import pino, { type Logger } from "pino";
 
 const level = process.env.LOG_LEVEL ?? "info";
 
@@ -30,3 +30,29 @@ export const logger = useTransport
       },
       pino.destination(2),
     );
+
+/**
+ * Wrap a tool handler with start/duration/error logging.
+ * Uses a child logger bound to { tool: <name> } so the parent's bindings
+ * (e.g. reqId) propagate automatically.
+ */
+export function withTrace<TArgs extends readonly unknown[], TResult>(
+  parentLog: Logger,
+  toolName: string,
+  fn: (...args: TArgs) => Promise<TResult>,
+): (...args: TArgs) => Promise<TResult> {
+  return async (...args: TArgs) => {
+    const start = Date.now();
+    const toolLog = parentLog.child({ tool: toolName });
+    try {
+      const result = await fn(...args);
+      toolLog.info({ durationMs: Date.now() - start }, "tool ok");
+      return result;
+    } catch (err) {
+      toolLog.error({ err, durationMs: Date.now() - start }, "tool failed");
+      throw err;
+    }
+  };
+}
+
+export type { Logger };
