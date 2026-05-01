@@ -44,8 +44,15 @@ export class AmpClient {
   private async loginController(): Promise<ADS> {
     const ads = new ADS(this.opts.baseUri, this.opts.username, this.opts.password);
     const result = (await ads.APILogin()) as LoginResult | undefined;
-    if (result && result.success === false) {
-      throw new Error(`AMP login failed: ${result.resultReason || "unknown reason"}`);
+    if (!result || result.success === false) {
+      const reason = result?.resultReason?.trim();
+      const code = result?.result;
+      const detail =
+        reason ||
+        (code === 0
+          ? "invalid credentials or account not authorized for API access"
+          : `result code ${code ?? "unknown"}`);
+      throw new Error(`AMP login failed (${detail}). Verify AMP_USERNAME, AMP_PASSWORD, and that the account has the necessary AMP role.`);
     }
     return ads;
   }

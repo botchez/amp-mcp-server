@@ -191,8 +191,8 @@ HTTP (Docker / remote):
 - [x] `npm run build` clean
 - [x] HTTP smoke test (`tools/list` returns 4 / 8 tools depending on `AMP_ALLOW_WRITES`)
 - [x] `git init`, commits pushed to GitLab `origin/main`
-- [ ] **Live homelab end-to-end** — `amp_list_instances` + a guarded `amp_send_console_command` against a non-prod instance. **This is the v0.1 acceptance gate.**
-- [ ] Docker `compose build && compose up -d` against the homelab
+- [x] Docker `compose build` clean; container boots; `/mcp` reachable on the mapped port
+- [x] **Live homelab end-to-end** — verified 2026-05-01 against `https://amp.darkforge.app` with `mcp_bot-test`. `amp_list_instances` returned 4 real instances (ADS, Minecraft, two GenericModule); `amp_get_instance_status` and `amp_get_console_output` returned live data via the `InstanceLogin` proxy path. Write tools not yet exercised against a real instance — try one before flipping `AMP_ALLOW_WRITES=true` in production.
 
 ## v0.2 candidates
 

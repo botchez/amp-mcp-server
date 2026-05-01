@@ -8,7 +8,7 @@ import { AmpClient } from "./amp-client.js";
 import { registerInstanceTools } from "./tools/instances.js";
 import { registerConsoleTools } from "./tools/console.js";
 
-const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.0" };
+const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.1" };
 
 const amp = AmpClient.fromEnv();
 
