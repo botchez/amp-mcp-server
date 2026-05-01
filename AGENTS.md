@@ -4,19 +4,21 @@ Context for AI coding agents (Claude Code, etc.) working on this repository.
 
 ---
 
-## RESUME HERE (2026-05-01 handoff)
+## RESUME HERE (2026-05-01 — Phases A–D in)
 
-A previous agent session scaffolded this repo from a vault working directory and handed off to you. State on handoff:
+v0.1 source + packaging is complete and pushed to GitLab. State for the next agent:
 
-- `package.json` is final-form (don't regenerate)
-- **Runtime deps installed**: `@modelcontextprotocol/sdk`, `zod` (v4 — see note below), `@cubecoders/ampapi`, `express`
-- **Dev deps NOT installed** — first thing to do: `npm install -D typescript @types/node @types/express`
-- No source files exist yet. No `tsconfig.json` yet. No git repo yet.
-- The remote will be a self-hosted GitLab (URL/handle TBD with Will — ask him before `git remote add`).
+- Remote: `https://gitlab.darkforge.app/weddins/amp-mcp-server.git` (origin)
+- All source written: `src/index.ts`, `src/amp-client.ts`, `src/tools/{instances,console}.ts`
+- Packaging: `Dockerfile`, `docker-compose.yml`, `README.md`, `LICENSE`, `.env.example`, `.gitignore`, `.dockerignore`
+- `npm run build` is clean. HTTP smoke test passes locally (`tools/list` returns the expected 4 / 8 tools depending on `AMP_ALLOW_WRITES`).
+- **NOT YET DONE**: end-to-end run against Will's live homelab AMP. That's the v0.1 acceptance gate.
 
-Suggested order of work (matches Status checklist below): install dev deps → tsconfig → inspect ampapi types → write `amp-client.ts` → tools → index.ts → Docker assets → README/LICENSE/.env.example/.gitignore → `npm run build` → smoke test → git init → push.
+**AMP client swap from the original plan**: `@cubecoders/ampapi` (official, but stale since 2020 and depends on the deprecated `request` library) was replaced with `@neuralnexus/ampapi@^1.0.19` (typed, maintained 2023–24, no transitive deps). The README and `package.json` now reflect this.
 
-**zod v4 caveat**: the MCP TypeScript quickstart uses zod v3. `npm install zod` pulled v4 here. If `McpServer.registerTool` schema definitions hit type errors, either downgrade (`npm install zod@3`) or adapt to v4's API. Check compat against `@modelcontextprotocol/sdk` v1.29.0 before downgrading.
+**zod v4 worked fine**: the SDK supports both v3 and v4 via `zod-compat.d.ts`. No downgrade needed.
+
+**TS 6 note**: TypeScript 6 with `module: NodeNext` does not auto-include `@types/node` globals (`process` etc.) — `tsconfig.json` explicitly sets `lib: ["ES2022"]` and `types: ["node"]`.
 
 ---
 
@@ -34,16 +36,18 @@ No MCP server existed for AMP as of 2026-05-01. Will runs AMP in his homelab. Bu
 
 ```
 MCP client (Claude Desktop / Code)
-        │  stdio  ── or ──  HTTP/SSE
+        │  stdio  ── or ──  HTTP (stateless Streamable)
         ▼
    amp-mcp-server  ── REST/JSON ──▶  AMP install (homelab)
         │
-        └─▶ @cubecoders/ampapi  (official MIT Node client)
+        └─▶ @neuralnexus/ampapi  (typed AMP client; no transitive deps)
 ```
 
 Transport is selected by the `MCP_TRANSPORT` env var:
 - `stdio` (default) — for direct local use; the MCP client spawns `node dist/index.js`
-- `http` — for Docker / remote deployment; server listens on `MCP_PORT` (default `3000`)
+- `http` — for Docker / remote deployment; server listens on `MCP_PORT` (default `3000`), `MCP_HOST` (default `127.0.0.1`)
+
+The HTTP path uses **stateless** Streamable HTTP: per-request `StreamableHTTPServerTransport` with `sessionIdGenerator: undefined` and a fresh `McpServer` built via `buildServer()`. The shared `AmpClient` singleton holds the AMP session.
 
 ## Tools exposed
 
@@ -157,47 +161,54 @@ HTTP (Docker / remote):
 | Package | Why |
 |---|---|
 | `@modelcontextprotocol/sdk` | MCP server framework, transports, schema helpers |
-| `@cubecoders/ampapi` | Official MIT-licensed AMP client — handles auth, session refresh, request shape |
-| `zod` | Tool input schemas |
+| `@neuralnexus/ampapi` | Typed community AMP client (auto-generated from AMP's `GetAPISpec`); dual GPL-3.0 / MIT, used here under MIT |
+| `zod` | Tool input schemas (v4; SDK 1.29 supports both v3/v4) |
 | `express` | HTTP transport host |
 
-Upstream caveat: `@cubecoders/ampapi` depends on the deprecated `request` library and ships a few moderate/critical npm-audit findings. These are server-side-only deps invoked against trusted AMP infrastructure, but worth tracking; if upstream switches off `request`, bump.
+`@neuralnexus/ampapi` has no transitive runtime deps (uses native `fetch`), so the original `@cubecoders/ampapi` audit caveat about the deprecated `request` library is gone.
 
 ## Decisions log
 
-- **Both transports, env-switched** — stdio for local Claude Desktop, HTTP for Docker. Avoids forcing a deployment style.
-- **Write tools gated by env var, not per-call confirmation** — the MCP client (Claude) already confirms tool calls with the user; an extra layer would be redundant. Env var is the project-level kill switch.
-- **MIT license** — matches `@cubecoders/ampapi` upstream; no friction for community contribution.
+- **HTTP-first, stateless** — `StreamableHTTPServerTransport` with `sessionIdGenerator: undefined`, fresh transport + `McpServer` per request via `buildServer()`. stdio retained as a small env-switch branch.
+- **Both transports, env-switched** — stdio for local Claude Desktop subprocess use, HTTP for Docker / remote.
+- **Write tools gated by env var, not per-call confirmation** — the MCP client already confirms tool calls with the user; an extra layer would be redundant. Env var is the project-level kill switch. Re-evaluated per request because `McpServer` is rebuilt each call.
+- **MIT license**.
+- **`@neuralnexus/ampapi` over `@cubecoders/ampapi`** — typed, maintained 2023–24, no `request` dep. See "Key dependencies" above.
 - **No tests in v0.1** — manual smoke via MCP Inspector + real AMP instance is the verification loop. Add Vitest once the API surface stabilizes.
-- **No CI in v0.1** — repo is being developed against a self-hosted GitLab first; CI added when project moves to a public remote.
+- **No CI in v0.1** — self-hosted GitLab first; CI added if/when the project moves to a public remote.
 
 ## Status
 
-- [x] Folder + `package.json` (final form)
-- [x] Runtime deps installed (`@modelcontextprotocol/sdk`, `zod`, `@cubecoders/ampapi`, `express`)
-- [ ] Dev deps installed (`typescript`, `@types/node`, `@types/express`) — **start here**
-- [ ] `tsconfig.json`
-- [ ] `src/amp-client.ts`
-- [ ] `src/tools/instances.ts`
-- [ ] `src/tools/console.ts`
-- [ ] `src/index.ts` (stdio + HTTP transport switch)
-- [ ] `Dockerfile` + `docker-compose.yml` + `.dockerignore`
-- [ ] `README.md`, `LICENSE` (MIT, holder = Will Eddins), `.gitignore`, `.env.example`
-- [ ] `npm run build` clean
-- [ ] MCP Inspector smoke test against real AMP install
-- [ ] Docker build clean
-- [ ] `git init` + first commit
-- [ ] Pushed to GitLab remote (ask Will for URL + namespace)
+- [x] Folder + `package.json` + runtime deps
+- [x] Dev deps installed (`typescript`, `@types/node`, `@types/express`)
+- [x] `tsconfig.json`
+- [x] `src/amp-client.ts`
+- [x] `src/tools/instances.ts`
+- [x] `src/tools/console.ts`
+- [x] `src/index.ts` (stdio + HTTP transport switch)
+- [x] `Dockerfile` + `docker-compose.yml` + `.dockerignore`
+- [x] `README.md`, `LICENSE` (MIT, holder = Will Eddins), `.gitignore`, `.env.example`
+- [x] `npm run build` clean
+- [x] HTTP smoke test (`tools/list` returns 4 / 8 tools depending on `AMP_ALLOW_WRITES`)
+- [x] `git init`, commits pushed to GitLab `origin/main`
+- [ ] **Live homelab end-to-end** — `amp_list_instances` + a guarded `amp_send_console_command` against a non-prod instance. **This is the v0.1 acceptance gate.**
+- [ ] Docker `compose build && compose up -d` against the homelab
 
-## Out of scope (for now)
+## v0.2 candidates
+
+- Package as an AMP Generic Module template — wrap the Docker image via `Meta.SpecificDockerImage` so AMP itself can install/manage this MCP server. Wiki: https://github.com/CubeCoders/AMP/wiki/Configuring-the-'Generic'-AMP-module ; community templates: https://github.com/CubeCoders/AMPTemplates.
+- `SIGTERM` handler for graceful HTTP shutdown (current behavior: process exits, in-flight responses dropped).
+- Possible C# port using `ModelContextProtocol.AspNetCore` — needs an `ampapi-csharp` codegen against `p0t4t0sandwich/ampapi-spec` first.
+
+## Out of scope (still)
 
 - Multi-AMP / multi-controller orchestration (one ADS at a time)
 - Resources or prompts (tools only)
 - Automated image publishing (GHCR / Docker Hub)
-- Public GitHub mirror (may come later — code is OSS-ready)
+- Public GitHub mirror
 
 ## For future agents
 
-- The `@cubecoders/ampapi` README only documents a few methods. The full API surface is exposed dynamically — the client's `initAsync()` populates method namespaces (`API.Core.*`, `API.ADSModule.*`, etc.) from the live AMP install. Inspect TypeScript types under `node_modules/@cubecoders/ampapi/` and use the live AMP install's `/API` endpoint for documentation.
-- AMP has two login flavors: top-level **ADS controller** (sees all instances, can start/stop them) and **per-instance** (sees one game server's console, players, etc.). For per-instance ops, you typically obtain a sub-API via the controller. Confirm the exact pattern from the installed package's types before writing instance-scoped tools.
-- The shared Bash shell on this dev box resets cwd to `G:\Obsidian\PersonalAssistant` after each command. Always prefix commands with `cd /d/Darkforge/amp-mcp-server &&` or use absolute paths.
+- AMP method names + signatures live in `node_modules/@neuralnexus/ampapi/dist/lib/` — fully typed. `IADSInstance`, `Instance`, `Status`, `Updates`, `ConsoleEntry`, `ActionResult<T>` are all exported. The `UUID` type is a strict template-literal alias `${string}-${string}-${string}-${string}-${string}`; pass user-supplied strings as `string` (not `UUID`) to satisfy the public API signatures.
+- AMP has two login flavors: top-level **ADS controller** (sees all instances, can start/stop them) and **per-instance** (sees one game server's console, players). The sub-API pattern is `controller.InstanceLogin<CommonAPI>(instanceId, moduleName)` — `AmpClient.getInstance(id)` in [src/amp-client.ts](src/amp-client.ts) auto-detects the module name from `ADSModule.GetInstances()`.
+- The shared Bash shell on this dev box resets cwd to `G:\Obsidian\PersonalAssistant` after each command. PowerShell tool keeps cwd; for git use absolute paths or `git -C` if reaching for Bash.

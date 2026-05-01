@@ -1,0 +1,15 @@
+services:
+  amp-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: amp-mcp-server:latest
+    container_name: amp-mcp-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 3000
+    ports:
+      - "${MCP_PORT:-3000}:3000"
