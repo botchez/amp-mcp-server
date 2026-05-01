@@ -84,6 +84,14 @@ export async function startHttp(amp: AmpClient, config: AppConfig): Promise<void
   const limiterMiddleware = buildRateLimiter(http.rateLimit);
   const allowWrites = config.amp.allowWrites;
 
+  // Liveness probe. Mounted before the /mcp middleware chain so it's not
+  // gated by auth, origin, or rate limiting — Docker/k8s healthchecks need
+  // to reach it without any of that. Liveness only: confirms the process is
+  // responsive, does NOT check downstream AMP connectivity.
+  app.get("/health", (_req: Request, res: Response) => {
+    res.status(200).json({ status: "ok" });
+  });
+
   app.post("/mcp", limiterMiddleware, originMiddleware, authMiddleware, async (req: Request, res: Response) => {
     const reqId = randomUUID();
     const sub = (res.locals as { auth?: { sub?: string } }).auth?.sub;

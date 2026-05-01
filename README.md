@@ -76,6 +76,8 @@ curl -X POST http://127.0.0.1:3000/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
+The HTTP transport also exposes `GET /health` (returns `{"status":"ok"}`) for Docker/k8s liveness probes — bypasses auth, rate limiting, and origin checks. The Dockerfile has a built-in `HEALTHCHECK` that hits this endpoint.
+
 ## Quick start — local Node (stdio or HTTP)
 
 Requires Node 20+.
