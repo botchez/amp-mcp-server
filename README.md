@@ -31,6 +31,7 @@ Default-off prevents accidental destructive calls.
 | `MCP_TRANSPORT` | no | `stdio` | `stdio` (subprocess use) or `http` (Docker / remote) |
 | `MCP_PORT` | no | `3000` | HTTP listen port (HTTP transport only) |
 | `MCP_HOST` | no | `127.0.0.1` | HTTP bind host (HTTP transport only) |
+| `LOG_LEVEL` | no | `info` | pino log level: `trace` / `debug` / `info` / `warn` / `error` / `fatal`. All logs go to stderr. |
 
 Copy `.env.example` to `.env` and fill in real values. **Never commit `.env`.**
 

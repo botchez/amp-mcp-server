@@ -7,8 +7,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { AmpClient } from "./amp-client.js";
 import { registerInstanceTools } from "./tools/instances.js";
 import { registerConsoleTools } from "./tools/console.js";
+import { logger } from "./logger.js";
 
-const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.1" };
+const SERVER_INFO = { name: "amp-mcp-server", version: "0.1.2" };
 
 const amp = AmpClient.fromEnv();
 
@@ -23,6 +24,7 @@ async function startStdio(): Promise<void> {
   const server = buildServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  logger.info("stdio transport connected");
 }
 
 async function startHttp(): Promise<void> {
@@ -41,7 +43,7 @@ async function startHttp(): Promise<void> {
         void server.close();
       });
     } catch (err) {
-      console.error("[amp-mcp-server] error handling /mcp request:", err);
+      logger.error({ err }, "error handling /mcp request");
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: "2.0",
@@ -63,7 +65,7 @@ async function startHttp(): Promise<void> {
   app.delete("/mcp", reject405);
 
   app.listen(port, host, () => {
-    console.error(`[amp-mcp-server] HTTP listening on http://${host}:${port}/mcp`);
+    logger.info({ host, port, url: `http://${host}:${port}/mcp` }, "HTTP transport listening");
   });
 }
 
@@ -73,13 +75,11 @@ const start =
   transport === "http" ? startHttp : transport === "stdio" ? startStdio : null;
 
 if (!start) {
-  console.error(
-    `[amp-mcp-server] unknown MCP_TRANSPORT: "${transport}". Expected "stdio" or "http".`,
-  );
+  logger.error({ transport }, 'unknown MCP_TRANSPORT (expected "stdio" or "http")');
   process.exit(1);
 }
 
 start().catch((err) => {
-  console.error("[amp-mcp-server] fatal:", err);
+  logger.fatal({ err }, "fatal startup error");
   process.exit(1);
 });
