@@ -310,6 +310,43 @@ HTTP (Docker / remote):
 }
 ```
 
+## Production deployment
+
+For exposure beyond your local machine:
+
+1. **Reverse proxy with TLS.** Don't put plain HTTP on the public internet. Caddy is the easiest path:
+   ```
+   amp-mcp.example.com {
+       reverse_proxy 127.0.0.1:3000
+   }
+   ```
+   Caddy auto-provisions Let's Encrypt. nginx and Traefik work the same way.
+
+2. **Set `MCP_TRUST_PROXY`.** Without it, the rate limiter sees every request as coming from the proxy and locks legitimate clients out at the threshold:
+   ```bash
+   MCP_TRUST_PROXY=loopback        # proxy on same host
+   # or
+   MCP_TRUST_PROXY=10.0.0.5/32     # CIDR for a specific upstream
+   ```
+
+3. **Pick an auth mode.** `bearer` for one or two known clients; `oauth` for multi-user or any client that expects spec-compliant MCP auth (e.g. Claude.ai connecting to a remote MCP server).
+
+4. **`MCP_PUBLIC_URL` must match exactly** what clients call (the proxy's external URL with scheme, *not* the internal Docker URL). Audience-mismatch is the #1 OAuth misconfig.
+
+The Docker image's default `MCP_HOST=0.0.0.0` won't start unless `MCP_AUTH_MODE` is `bearer`/`oauth`, `MCP_ALLOWED_HOSTS` is set, or `MCP_ALLOW_INSECURE=true` is the explicit override. This is intentional — it prevents accidental public-no-auth deploys.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Server exits immediately with `refusing to start: MCP_HOST binds to all interfaces...` | Unsafe-binding safety guard | Set `MCP_AUTH_MODE=bearer`/`oauth`, set `MCP_ALLOWED_HOSTS`, or override with `MCP_ALLOW_INSECURE=true` |
+| OAuth: `401` with token that looks valid | JWT `aud` doesn't match `MCP_OAUTH_AUDIENCE` (or `MCP_PUBLIC_URL` if audience override is unset) | Decode the JWT and check the `aud` array contains the configured audience *exactly* |
+| OAuth: `401 invalid_token` after a successful login | Token issuer mismatches `MCP_OAUTH_ISSUER`, or AS rotated signing keys and JWKS cache is stale | Verify `MCP_OAUTH_ISSUER` matches the token's `iss`; restart server to flush JWKS cache |
+| All clients get `429` after one client misbehaves | All traffic appearing as one IP because `MCP_TRUST_PROXY` isn't set | Set `MCP_TRUST_PROXY` to the proxy CIDR or `loopback` |
+| Duende: `invalid_scope` even though the scope shows on the client | Scope is in client's allowed-scopes list but isn't defined as an `ApiScope` in IdentityServer | Add it under "API Scopes" + "API Resources", restart Duende to flush config cache |
+| Duende: post-consent redirect bounces back to login | Cookie/SameSite issue on the post-consent redirect | Disable `RequireConsent` on the client as a workaround, or fix Duende's cookie config |
+| `npm test` fails with "no tests" but no errors | vitest cache flake during back-to-back `build` + `test` invocations | Re-run `npm test` |
+
 ## Architecture
 
 ```
