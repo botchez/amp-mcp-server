@@ -310,6 +310,16 @@ HTTP (Docker / remote):
 }
 ```
 
+## Install as a CubeCoders AMP instance
+
+CubeCoders AMP custom application templates for amp-mcp-server live in a dedicated repo: **[eddinsw/amp-templates](https://github.com/eddinsw/amp-templates)**. Two variants are available — host-process (any AMP tier) and Docker (AMP Enterprise + Docker-instances).
+
+Quick install: in the AMP web UI go to **Configuration → Instance Deployment → Configuration Repositories**, add `eddinsw/amp-templates:main`, click **Fetch Latest**. Both `amp-mcp-server` and `amp-mcp-server (Docker)` then appear in the New Instance wizard.
+
+The Docker variant pulls `ghcr.io/eddinsw/amp-mcp-server:latest`, published from this repo by [.github/workflows/publish-image.yml](.github/workflows/publish-image.yml) on every tag and main push.
+
+Full walkthrough, variant comparison, configuration reference, and troubleshooting: see [the amp-templates README](https://github.com/eddinsw/amp-templates#readme).
+
 ## Production deployment
 
 For exposure beyond your local machine:
