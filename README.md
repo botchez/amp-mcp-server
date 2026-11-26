@@ -26,6 +26,17 @@ Write tools (gated by `AMP_ALLOW_WRITES=true`):
 - `amp_update_application` — apply a pending game-server update (long-running)
 - `amp_end_user_session` — disconnect a user session (universal kick across modules)
 
+Provisioning (fork additions):
+
+- `amp_get_settings` / `amp_list_files` — read-only, always enabled: search an instance's AMP settings (node names, current values, allowed options) and browse its game directory
+- `amp_create_instance` — create a new instance (e.g. a Minecraft server) on the local controller *(write)*
+- `amp_set_settings` — change settings such as server type, Minecraft/Forge version, Java version, heap size, difficulty *(write)*
+- `amp_install_server_pack` — download a modpack server pack (or any file) from a URL into the instance and extract it *(write)*
+- `amp_accept_minecraft_eula` — accept the Minecraft EULA for an instance *(write)*
+- `amp_start_game_server` — start the game server inside an instance and wait until it reports Ready *(write)*
+
+Typical modpack flow: `amp_create_instance` → `amp_set_settings` (loader + versions + RAM) → `amp_update_application` (installs the loader) → `amp_install_server_pack` → `amp_accept_minecraft_eula` → `amp_start_game_server`.
+
 Default-off prevents accidental destructive calls.
 
 ## Environment

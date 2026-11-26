@@ -6,6 +6,7 @@ import type { AmpClient } from "./amp-client.js";
 import { registerInstanceTools } from "./tools/instances.js";
 import { registerConsoleTools } from "./tools/console.js";
 import { registerOperationsTools } from "./tools/operations.js";
+import { registerProvisioningTools } from "./tools/provisioning.js";
 import type { Logger } from "./logger.js";
 
 // Read package.json once at startup so the advertised version doesn't drift.
@@ -19,5 +20,6 @@ export function buildServer(amp: AmpClient, log: Logger, allowWrites: boolean): 
   registerInstanceTools(server, amp, log, allowWrites);
   registerConsoleTools(server, amp, log, allowWrites);
   registerOperationsTools(server, amp, log, allowWrites);
+  registerProvisioningTools(server, amp, log, allowWrites);
   return server;
 }
